@@ -10,7 +10,7 @@ def read(fname):
 
 setup(
     name='pytest-study',
-    packages=['pytest-study'],
+    # packages=['pytest-study'],
     version='0.1',
     description="A pytest plugin to organize long run tests (named studies) without interfering the regular tests",
     author='Asterio Gonzalez',
@@ -26,8 +26,7 @@ setup(
     ],
 
     long_description=read("README.md"),
-    py_modules=['pytest_study'],
-    entry_points={'pytest11': ['study = pytest_study']},
-    install_requires=['pytest>=2.0', 'blessings'],
-
+    # py_modules=['pytest_study'],
+    # entry_points={'pytest11': ['study = pytest_study']},
+    install_requires=['pytest>=2.0', 'blessings']
 )

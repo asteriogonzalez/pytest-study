@@ -1,16 +1,36 @@
+"""
+In situations where we are developing an application or library
+that will be use to create long computation reports or results,
+we want to execute the long process only when all the project tests
+are passed.
+
+pytest provide a great support for creating test suits,
+parallel execution, reports, command line, IDE of CI integration,
+and so forth, so the idea is to write these long computation code
+in test from, group them in studios and extend pytest with a plugin
+that allow us to:
+
+- Ignore these long computation studies and run only the regular ones.
+- Sort all the involved tests so the study will be executed only when
+  all dependences are passed.
+- Define the studies and dependences in a easy way.
+- Don't interfere with normal pytest use.
+
+For a more detailed refecences, please read README.md or
+visit https://github.com/asteriogonzalez/pytest-study
+"""
 from __future__ import print_function
-try:
+# try:
     # import wingdbstub
-    pass
-except ImportError:
-    pass
+# except ImportError:
+    # pass
 
 import pytest
 from blessings import Terminal
 
 term = Terminal()
 
-marks = ['study', 'pre']  # match 1st ocurrence
+MARKS = ['study', 'pre']  # match 1st ocurrence
 
 
 def parse_args(args, kwargs):
@@ -28,7 +48,8 @@ def parse_args(args, kwargs):
 
 
 def get_study_name(item):
-    for mark in marks:
+    "Try to get the name where the test belongs to, or '' when is free"
+    for mark in MARKS:
         marker = item.get_marker(mark)
         if marker:
             return parse_args(marker.args, marker.kwargs)['name']
@@ -40,6 +61,7 @@ def get_study_name(item):
 
 
 def pytest_addoption(parser):
+    "Add the --runstudy option in command line"
     parser.addoption("--runstudy", action="store_true",
                      default=False, help="run studio processes")
 
@@ -60,28 +82,28 @@ def pytest_collection_modifyitems(config, items):
         # set @pytest.hookimpl(trylast=True) by default for all studio tests
         test_sequence = list()
         groups = dict()
-        study_prerequisites = dict()
         incremental = pytest.mark.incremental()
 
         def add():
             "helper for gathering test info"
             marker = item.get_marker(mark)
-            kw = parse_args(marker.args, marker.kwargs)
-            name = kw['name']
+            kwargs = parse_args(marker.args, marker.kwargs)
+            name = kwargs['name']
             group = groups.setdefault(name, dict())
-            group.setdefault(mark, list()).append((kw, item))
+            group.setdefault(mark, list()).append((kwargs, item))
             item.add_marker(incremental)
 
         # place every test in regular, prerequisite and studies
         # group by name
         for item in items:
-            for mark in set(item.keywords.keys()).intersection(marks):
+            for mark in set(item.keywords.keys()).intersection(MARKS):
                 add()
                 break
             else:
                 test_sequence.append(item)
 
         def sort(a, b):
+            "Sort two items by order priority"
             return cmp(a[0]['order'], b[0]['order'])
 
         # use studies precedence to built the global sequence order
@@ -92,6 +114,7 @@ def pytest_collection_modifyitems(config, items):
         studies.sort(sort)
 
         def append(tests):
+            "helper to add the test item from info structure"
             for test in tests:
                 test_sequence.append(test[1])
 
