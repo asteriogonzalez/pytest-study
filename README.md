@@ -206,6 +206,13 @@ where the sequence order and the name of associate study is show for each test.
 $ pip install pytest-study
 ```
 
+or download and improve the code by yourself installing in develop mode in your home directory
+
+```
+ python setup.py develop --user
+```
+
+
 ## Python versions
 
 Is tested only in python 2.7, but there is not any deliberated incompatibility with python 3.x versions.
