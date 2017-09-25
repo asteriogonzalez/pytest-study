@@ -20,10 +20,10 @@ For a more detailed refecences, please read README.md or
 visit https://github.com/asteriogonzalez/pytest-study
 """
 from __future__ import print_function
-# try:
-    # import wingdbstub
-# except ImportError:
-    # pass
+try:
+    import wingdbstub
+except ImportError:
+    pass
 
 import pytest
 from blessings import Terminal
@@ -55,6 +55,16 @@ def get_study_name(item):
             return parse_args(marker.args, marker.kwargs)['name']
     return ''
 
+
+def get_FQN(item):
+    "Get the Full Qualified Name of a test item"
+    names = []
+    for x in item.listchain():
+        if not isinstance(x, (pytest.Session, pytest.Instance)):
+            names.append(x.name)
+
+    return ':'.join(names)
+
 # ------------------------------------------
 # Skip studio tests
 # ------------------------------------------
@@ -64,6 +74,10 @@ def pytest_addoption(parser):
     "Add the --runstudy option in command line"
     parser.addoption("--runstudy", action="store_true",
                      default=False, help="run studio processes")
+
+    parser.addoption("--show_order", action="store_true",
+                     default=False,
+                     help="show test and studio order execution")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -77,67 +91,73 @@ def pytest_collection_modifyitems(config, items):
       are passed.
     """
     # check if studio tests myst be skipped
-    if config.getoption("--runstudy"):
-        # --runstudy given in cli: do not skip study tests and
-        # set @pytest.hookimpl(trylast=True) by default for all studio tests
-        test_sequence = list()
-        groups = dict()
-        incremental = pytest.mark.incremental()
+    run_study = config.getoption("--runstudy")
+    # --runstudy given in cli: do not skip study tests and
+    test_sequence = list()
+    groups = dict()
+    incremental = pytest.mark.incremental()
 
-        def add():
-            "helper for gathering test info"
-            marker = item.get_marker(mark)
-            kwargs = parse_args(marker.args, marker.kwargs)
-            name = kwargs['name']
-            group = groups.setdefault(name, dict())
-            group.setdefault(mark, list()).append((kwargs, item))
-            item.add_marker(incremental)
+    def add():
+        "helper for gathering test info"
+        marker = item.get_marker(mark)
+        kwargs = parse_args(marker.args, marker.kwargs)
+        group_name = kwargs['name']
+        group = groups.setdefault(group_name, dict())
+        group.setdefault(mark, list()).append((kwargs, item))
+        item.add_marker(incremental)
 
-        # place every test in regular, prerequisite and studies
-        # group by name
-        for item in items:
-            for mark in set(item.keywords.keys()).intersection(MARKS):
-                add()
-                break
-            else:
-                test_sequence.append(item)
+    # place every test in regular, prerequisite and studies
+    # group by name
+    for item in items:
+        # DELETE: print('- %s : %s : %s' % (item.name, id(item), item.__class__.__name__))
+        for mark in set(item.keywords.keys()).intersection(MARKS):
+            add()
+            break
+        else:
+            test_sequence.append(item)
 
-        def sort(a, b):
-            "Sort two items by order priority"
-            return cmp(a[0]['order'], b[0]['order'])
+    def sort(a, b):
+        "Sort two items by order priority"
+        return cmp(a[0]['order'], b[0]['order'])
 
-        # use studies precedence to built the global sequence order
-        mandatory = 'study'  # mandatory mark for global sorting: study
-        studies = list()
-        for name, info in groups.items():
-            studies.extend(info.get(mandatory, []))
-        studies.sort(sort)
+    # use studies precedence to built the global sequence order
+    mandatory = 'study'  # mandatory mark for global sorting: study
+    studies = list()
+    for name, info in groups.items():
+        studies.extend(info.get(mandatory, []))
+    studies.sort(sort)
 
-        def append(tests):
-            "helper to add the test item from info structure"
-            for test in tests:
-                test_sequence.append(test[1])
+    def append(tests):
+        "helper to add the test item from info structure"
+        for test in tests:
+            test = test[1]
+            if test not in test_sequence:
+                test_sequence.append(test)
 
-        width = 0
-        for study in studies:
-            name = study[0]['name']
-            width = max(width, len(name))
-            for mark, seq in groups[name].items():
-                if mark == mandatory:
-                    continue
-                seq.sort(sort)
-                append(seq)
-            append([study])
+    width = 0
+    for study in studies:
+        group_name = study[0]['name']
+        width = max(width, len(group_name))
+        for mark, seq in groups[group_name].items():
+            if mark == mandatory:
+                continue
+            seq.sort(sort)
+            append(seq)
+        append([study])
 
-        # reorder tests by group name and replace items IN-PLACE
-        if config.getoption("--debug"):
-            fmt = "{0:>3d} [{1:>%s}] {2}" % width
-            for i, item in enumerate(test_sequence):
-                name = get_study_name(item)
-                line = fmt.format(i, name, ':'.join(item.listnames()[-2:]))
-                line = term.yellow(line)
-                print(line)
+    # reorder tests by group name and replace items IN-PLACE
+    if config.getoption("--show_order") or config.getoption("--debug"):
+        fmt = "{0:>3d} [{1:>%s}] {2}" % width
+        for i, item in enumerate(test_sequence):
+            study = get_study_name(item)
+            fqn = get_FQN(item)
+            line = fmt.format(i, study, fqn)
+            line = term.yellow(line)
+            print(line)
 
+    # we make the --runstudy check at the end to be able to show
+    # test order with --show_order or --debig options
+    if run_study:
         items[:] = test_sequence
         return
 
