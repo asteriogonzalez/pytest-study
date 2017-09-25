@@ -1,5 +1,5 @@
 # pytest-study
-A pytest plugin for organizing long run tests (studies) without interfering the regular tests
+A pytest plugin for organizing long run tests (named *studies*) without interfering the regular tests
 
 ## Abstract
 
