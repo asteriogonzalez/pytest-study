@@ -32,24 +32,22 @@ def test_independent():
 
 @pytest.mark.study
 def test_foo():
-    "This is a test that belongs to a study"
+    "This is a test that belongs to the default study"
     time.sleep(0.1)
     print "Inside foo test!"
     assert True
 
 @pytest.mark.study
-def test_study_1():
-    """This is the 1st long run computation test that will be executed
+def test_study_one():
+    """This is a long run computation test that will be executed
     only if any previous test has been passed.
-
-    These studies names match 'test_study_xxx' pattern.
     """
     time.sleep(0.2)
     print "Study 1 Hello World!"
 
 ```
 
-Executing pytest normally will yield
+Executing pytest showing the hooks trace  would yield something like;
 
 ```bash
 $ pytest --duration=10
@@ -64,16 +62,16 @@ tests/test_studies.py .ss
 0.05s call     tests/test_studies.py::test_independent
 0.00s teardown tests/test_studies.py::test_independent
 0.00s setup    tests/test_studies.py::test_foo
-0.00s setup    tests/test_studies.py::test_study_1
+0.00s setup    tests/test_studies.py::test_study_one
 0.00s setup    tests/test_studies.py::test_independent
-0.00s teardown tests/test_studies.py::test_study_1
+0.00s teardown tests/test_studies.py::test_study_one
 0.00s teardown tests/test_studies.py::test_foo
 ===================== 1 passed, 2 skipped in 0.07 seconds ======================
 ```
 
-where only `test_indepent()` has been called and the others are skipped from execution.
+where only `test_indepent()` has been called (note the mark `call`) and the others are skipped from execution.
 
-Executing pytest with `--runstudy` will yield
+Now, executing pytest with `--runstudy` will show:
 
 ```bash
 $ pytest --duration=10 --runstudy
@@ -85,27 +83,29 @@ collected 3 items
 tests/test_studies.py ...
 
 ========================== slowest 10 test durations ===========================
-0.20s call     tests/test_studies.py::test_study_1
+0.20s call     tests/test_studies.py::test_study_one
 0.10s call     tests/test_studies.py::test_foo
 0.05s call     tests/test_studies.py::test_independent
 0.00s setup    tests/test_studies.py::test_foo
 0.00s teardown tests/test_studies.py::test_foo
 0.00s teardown tests/test_studies.py::test_independent
-0.00s setup    tests/test_studies.py::test_study_1
-0.00s teardown tests/test_studies.py::test_study_1
+0.00s setup    tests/test_studies.py::test_study_one
+0.00s teardown tests/test_studies.py::test_study_one
 0.00s setup    tests/test_studies.py::test_independent
 =========================== 3 passed in 0.37 seconds ===========================
 
 ```
 
-where `test_foo()` and `test_study_1()` has been called as well.
+where `test_foo()` and `test_study_one()` has been called as well.
 
 
 ## Studies interdependences
 
-We can add more test studies and group them by name. You can also set a relative priority among studies and prerequisites belonging to a same study with the keyword `order=<value>`. The default priority is 1000, so any value lower will be executed first and the reverse is also true.
+We can add more test studies and group them by name and setting a relative priority for the studies executions with the keyword `order=<value>`. The default priority is 1000, so any value lower will be executed first and the reverse is also true.
 
-Creating a group named 'AI' and setting some orders we have:
+All prerequisites belonging to the same study with be ordered using the same criteria.
+
+Let's create a group named 'AI' and setting some orders:
 
 ```python
 import pytest
@@ -162,11 +162,13 @@ def test_prior_bar():
 
 @pytest.mark.study(order=1)
 def test_study_two():
-    """This studio will be executed before test_study_one because
-    we have changed the order. All test_study_two() prerequisite will
-    be executed before calling, but not test_study_one() prerequisites.
+    """This studio will be executed before test_study_one() because
+    we have changed the priority order to 1.
 
-    This allows to execute the studies ASAP.
+    All test_study_two() prerequisites will be executed before calling it
+    but none from test_study_one() prerequisites.
+
+    This allows to execute the studies ASAP in blocks.
     """
     time.sleep(0.3)
     print "Study 2 Hello World again!"
@@ -178,7 +180,6 @@ If we execute pytest with the `--debug` option as well, the output would be simi
 
 ```bash
 $ pytest  --runstudy --debug
-writing pytestdebug information to /home/agp/Documents/me/code/pytest-study/pytestdebug.log
 ============================= test session starts ==============================
 platform linux2 -- Python 2.7.13, pytest-3.2.2, py-1.4.34, pluggy-0.4.0 -- /usr/lib/wingide6/wingdb
 using: pytest-3.2.2 pylib-1.4.34
@@ -204,6 +205,7 @@ where the sequence order and the name of associate study is show for each test.
 ```
 $ pip install pytest-study
 ```
+
 ## Python versions
 
-Is tested only in python 2.7, but there's not any deliberated incompatibility with python 3.x versions.
+Is tested only in python 2.7, but there is not any deliberated incompatibility with python 3.x versions.
