@@ -20,10 +20,10 @@ For a more detailed refecences, please read README.md or
 visit https://github.com/asteriogonzalez/pytest-study
 """
 from __future__ import print_function
-# try:
-    # import wingdbstub
-# except ImportError:
-    # pass
+try:
+    import wingdbstub
+except ImportError:
+    pass
 
 import re
 import pytest
@@ -36,7 +36,7 @@ MARKS = ['study', 'pre']  # match 1st ocurrence
 
 def parse_args(args, kwargs):
     "update kwargs with positional arguments"
-    positional = ['name', 'order'],
+    positional = ['name', 'order']
     kw = {'name': 'default', 'order': 1000}
     kw.update(kwargs)
     for key in kwargs:
