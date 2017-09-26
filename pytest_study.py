@@ -20,11 +20,12 @@ For a more detailed refecences, please read README.md or
 visit https://github.com/asteriogonzalez/pytest-study
 """
 from __future__ import print_function
-try:
-    import wingdbstub
-except ImportError:
-    pass
+# try:
+    # import wingdbstub
+# except ImportError:
+    # pass
 
+import re
 import pytest
 from blessings import Terminal
 
@@ -72,12 +73,19 @@ def get_FQN(item):
 
 def pytest_addoption(parser):
     "Add the --runstudy option in command line"
-    parser.addoption("--runstudy", action="store_true",
-                     default=False, help="run studio processes")
+    # parser.addoption("--runstudy", action="store_true",
+                    # default=False, help="run studio processes")
 
     parser.addoption("--show_order", action="store_true",
-                     default=False,
-                     help="show test and studio order execution")
+                    default=False,
+                    help="""show tests and studies order execution
+                    and which are selected for execution.""")
+
+    parser.addoption("--runstudy", action="store", type="string",
+                    default='', metavar='all|reg expression',
+                    help="""regular expression for the studies names
+                    ('all' runs all).
+                    None is selected by default.""")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -92,8 +100,11 @@ def pytest_collection_modifyitems(config, items):
     """
     # check if studio tests myst be skipped
     run_study = config.getoption("--runstudy")
+    # 'all' will match all studies, '' will not match anything
+    run_study = {'': '(?!x)x', 'all': '.*'}.get(run_study, run_study)
     # --runstudy given in cli: do not skip study tests and
-    test_sequence = list()
+    test_selected = list()
+    test_skipped = list()
     groups = dict()
     incremental = pytest.mark.incremental()
 
@@ -109,12 +120,11 @@ def pytest_collection_modifyitems(config, items):
     # place every test in regular, prerequisite and studies
     # group by name
     for item in items:
-        # DELETE: print('- %s : %s : %s' % (item.name, id(item), item.__class__.__name__))
         for mark in set(item.keywords.keys()).intersection(MARKS):
             add()
             break
         else:
-            test_sequence.append(item)
+            test_selected.append(item)
 
     def sort(a, b):
         "Sort two items by order priority"
@@ -127,38 +137,44 @@ def pytest_collection_modifyitems(config, items):
         studies.extend(info.get(mandatory, []))
     studies.sort(sort)
 
-    def append(tests):
+    def append(tests, where):
         "helper to add the test item from info structure"
         for test in tests:
             test = test[1]
-            if test not in test_sequence:
-                test_sequence.append(test)
+            if test not in where:
+                where.append(test)
 
+    # select only the test that are going to be launched
     width = 0
+    regexp = re.compile(run_study, re.I | re.DOTALL)
     for study in studies:
         group_name = study[0]['name']
         width = max(width, len(group_name))
+        where = test_selected if regexp.search(group_name) else test_skipped
         for mark, seq in groups[group_name].items():
             if mark == mandatory:
                 continue
             seq.sort(sort)
-            append(seq)
-        append([study])
+            append(seq, where)
+        append([study], where)
 
-    # reorder tests by group name and replace items IN-PLACE
     if config.getoption("--show_order") or config.getoption("--debug"):
         fmt = "{0:>3d} [{1:>%s}] {2}" % width
-        for i, item in enumerate(test_sequence):
+        for i, item in enumerate(test_selected + test_skipped):
             study = get_study_name(item)
             fqn = get_FQN(item)
             line = fmt.format(i, study, fqn)
-            line = term.yellow(line)
+            if item in test_selected:
+                line = term.green('+' + line)
+            else:
+                line = term.yellow('-' + line)
             print(line)
 
     # we make the --runstudy check at the end to be able to show
     # test order with --show_order or --debig options
+    # reorder tests by group name and replace items IN-PLACE
     if run_study:
-        items[:] = test_sequence
+        items[:] = test_selected
         return
 
     skip_test = pytest.mark.skip(reason="need --runstudy option to run")

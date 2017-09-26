@@ -47,56 +47,79 @@ def test_study_one():
 
 ```
 
+## Usage
+
+The following parameters are available from the command line
+
+
+```bash
+$ pytest --help
+
+... (other options are not shown) ...
+
+custom options:
+  --show_order          show tests and studies order execution and which are
+                        selected for execution.
+  --runstudy=all|reg expression
+                        regular expression for the studies names ('all' runs
+                        all). None is selected by default.
+```
+
 Executing pytest showing the hooks trace  would yield something like;
 
 ```bash
-$ pytest --duration=10
-============================= test session starts ==============================
+$ pytest --duration=10 --show_order
+====================================== test session starts =======================================
 platform linux2 -- Python 2.7.13, pytest-3.2.2, py-1.4.34, pluggy-0.4.0
-plugins: timeout-1.2.0, testmon-0.9.6, race-0.1.1, pep8-1.0.6, cov-2.5.1, colordots-0.1, dependency-0.2, study-0.1
-collected 3 items
+plugins: study-0.12, timeout-1.2.0, testmon-0.9.6, race-0.1.1, pep8-1.0.6, cov-2.5.1, colordots-0.1, dependency-0.2
+collected 3 items                                                                                 
++  0 [       ] tests/test_studies.py:test_independent
+-  1 [default] tests/test_studies.py:test_foo
+-  2 [default] tests/test_studies.py:test_study_one
 
-tests/test_studies.py .ss
+tests/test_studies.py .
 
-========================== slowest 10 test durations ===========================
+=================================== slowest 10 test durations ====================================
 0.05s call     tests/test_studies.py::test_independent
-0.00s teardown tests/test_studies.py::test_independent
-0.00s setup    tests/test_studies.py::test_foo
-0.00s setup    tests/test_studies.py::test_study_one
 0.00s setup    tests/test_studies.py::test_independent
-0.00s teardown tests/test_studies.py::test_study_one
-0.00s teardown tests/test_studies.py::test_foo
-===================== 1 passed, 2 skipped in 0.07 seconds ======================
+0.00s teardown tests/test_studies.py::test_independent
+==================================== 1 passed in 0.08 seconds ====================================
+
 ```
 
-where only `test_indepent()` has been called (note the mark `call`) and the others are skipped from execution.
+where only `test_indepent()` has been called (note the `call` tag) and the others are skipped from execution.
 
-Now, executing pytest with `--runstudy` will show:
+Now, executing pytest with `--runstudy=all` we get show:
 
 ```bash
-$ pytest --duration=10 --runstudy
-============================= test session starts ==============================
+$ pytest --duration=10 --show_order --runstudy=all
+====================================== test session starts =======================================
 platform linux2 -- Python 2.7.13, pytest-3.2.2, py-1.4.34, pluggy-0.4.0
-plugins: timeout-1.2.0, testmon-0.9.6, race-0.1.1, pep8-1.0.6, cov-2.5.1, colordots-0.1, dependency-0.2, study-0.1
-collected 3 items
+plugins: study-0.12, timeout-1.2.0, testmon-0.9.6, race-0.1.1, pep8-1.0.6, cov-2.5.1, colordots-0.1, dependency-0.2
+collected 3 items                                                                                 
++  0 [       ] tests/test_studies.py:test_independent
++  1 [default] tests/test_studies.py:test_foo
++  2 [default] tests/test_studies.py:test_study_one
 
 tests/test_studies.py ...
 
-========================== slowest 10 test durations ===========================
+=================================== slowest 10 test durations ====================================
 0.20s call     tests/test_studies.py::test_study_one
 0.10s call     tests/test_studies.py::test_foo
 0.05s call     tests/test_studies.py::test_independent
-0.00s setup    tests/test_studies.py::test_foo
-0.00s teardown tests/test_studies.py::test_foo
-0.00s teardown tests/test_studies.py::test_independent
-0.00s setup    tests/test_studies.py::test_study_one
-0.00s teardown tests/test_studies.py::test_study_one
 0.00s setup    tests/test_studies.py::test_independent
-=========================== 3 passed in 0.37 seconds ===========================
+0.00s teardown tests/test_studies.py::test_independent
+0.00s setup    tests/test_studies.py::test_foo
+0.00s setup    tests/test_studies.py::test_study_one
+0.00s teardown tests/test_studies.py::test_foo
+0.00s teardown tests/test_studies.py::test_study_one
+==================================== 3 passed in 0.38 seconds ====================================
+
 
 ```
 
 where `test_foo()` and `test_study_one()` has been called as well.
+Note the `+` symbol at the beginning of each test shown by `--show_order` option.
 
 
 ## Studies interdependences
@@ -105,11 +128,15 @@ We can add more test studies and group them by name and setting a relative prior
 
 All prerequisites belonging to the same study with be ordered using the same criteria.
 
-Let's create a group named 'AI' and setting some orders:
+Let's create a more rich example with a group named 'AI' and set some execution order:
 
 ```python
 import pytest
 import time
+
+# make some 'alias'
+study = pytest.mark.study
+pre = pytest.mark.pre
 
 # You can put the regular tests and the studies in any order
 # pytest-study will reorder later
@@ -123,7 +150,7 @@ def test_independent():
 # in command line
 
 
-@pytest.mark.pre(name='AI')
+@pre(name='AI')
 def test_foo():
     "This is a prerequisite test that belongs to the 'AI' study"
     time.sleep(0.1)
@@ -131,13 +158,13 @@ def test_foo():
     assert True
 
 
-@pytest.mark.pre(name='AI', order=5)
+@pre(name='AI', order=5)
 def test_gather_info():
     "Another prerequisite for 'AI' study"
     time.sleep(0.1)
 
 
-@pytest.mark.study(name='AI')
+@study(name='AI')
 def test_study_one():
     """This is a long computation study that will be executed
     only if test_gather_info() and test_foo() has been passed (in that order)
@@ -146,7 +173,7 @@ def test_study_one():
     print "Study 1 Hello World!"
 
 
-@pytest.mark.pre
+@pre
 def test_bar():
     "This is a prerequisite test belonging to 'default' study"
     time.sleep(0.15)
@@ -154,51 +181,85 @@ def test_bar():
     assert True
 
 
-@pytest.mark.pre(order=5)
+@pre(order=5)
 def test_prior_bar():
     "This is the prerequisite that is executed prior test_bar()"
     time.sleep(0.15)
 
 
-@pytest.mark.study(order=1)
+@study(order=1)
 def test_study_two():
-    """This studio will be executed before test_study_one() because
-    we have changed the priority order to 1.
+    """This studio will be executed before test_study_one because
+    we have changed the order. All test_study_two() prerequisite will
+    be executed before calling, but not test_study_one() prerequisites.
 
-    All test_study_two() prerequisites will be executed before calling it
-    but none from test_study_one() prerequisites.
-
-    This allows to execute the studies ASAP in blocks.
+    This allows to execute the studies ASAP.
     """
     time.sleep(0.3)
     print "Study 2 Hello World again!"
 
 ```
 
-
-If we execute pytest with the `--debug` option as well, the output would be similar to:
+If we execute pytest with the `--show_order` option as well, the output would be similar to:
 
 ```bash
-$ pytest  --runstudy --debug
-============================= test session starts ==============================
-platform linux2 -- Python 2.7.13, pytest-3.2.2, py-1.4.34, pluggy-0.4.0 -- /usr/lib/wingide6/wingdb
-using: pytest-3.2.2 pylib-1.4.34
-collected 7 items
-  0 [       ] tests/test_studies.py:test_independent
-  1 [default] tests/test_studies.py:test_prior_bar
-  2 [default] tests/test_studies.py:test_bar
-  3 [default] tests/test_studies.py:test_study_two
-  4 [     AI] tests/test_studies.py:test_gather_info
-  5 [     AI] tests/test_studies.py:test_foo
-  6 [     AI] tests/test_studies.py:test_study_one
+$ pytest --duration=10 --show_order 
+====================================== test session starts =======================================
+platform linux2 -- Python 2.7.13, pytest-3.2.2, py-1.4.34, pluggy-0.4.0
+plugins: study-0.12, timeout-1.2.0, testmon-0.9.6, race-0.1.1, pep8-1.0.6, cov-2.5.1, colordots-0.1, dependency-0.2
+collected 7 items                                                                                 
++  0 [       ] tests/test_studies.py:test_independent
+-  1 [default] tests/test_studies.py:test_prior_bar
+-  2 [default] tests/test_studies.py:test_bar
+-  3 [default] tests/test_studies.py:test_study_two
+-  4 [     AI] tests/test_studies.py:test_gather_info
+-  5 [     AI] tests/test_studies.py:test_foo
+-  6 [     AI] tests/test_studies.py:test_study_one
 
-tests/test_studies.py .......
+tests/test_studies.py .
 
-=========================== 7 passed in 1.09 seconds ===========================
+=================================== slowest 10 test durations ====================================
+0.05s call     tests/test_studies.py::test_independent
+0.00s setup    tests/test_studies.py::test_independent
+0.00s teardown tests/test_studies.py::test_independent
+==================================== 1 passed in 0.08 seconds ====================================
 
 ```
 
-where the sequence order and the name of associate study is show for each test.
+where the sequence order, the selected flag and the name of associate study is show for each test.
+
+To run a one or more studies we can use a regular expression that match the studio name.
+
+```bash
+$ pytest --duration=10 --show_order --runstudy='AI'
+====================================== test session starts =======================================
+platform linux2 -- Python 2.7.13, pytest-3.2.2, py-1.4.34, pluggy-0.4.0
+plugins: study-0.12, timeout-1.2.0, testmon-0.9.6, race-0.1.1, pep8-1.0.6, cov-2.5.1, colordots-0.1, dependency-0.2
+collected 7 items                                                                                 
++  0 [       ] tests/test_studies.py:test_independent
++  1 [     AI] tests/test_studies.py:test_gather_info
++  2 [     AI] tests/test_studies.py:test_foo
++  3 [     AI] tests/test_studies.py:test_study_one
+-  4 [default] tests/test_studies.py:test_prior_bar
+-  5 [default] tests/test_studies.py:test_bar
+-  6 [default] tests/test_studies.py:test_study_two
+
+tests/test_studies.py ....
+
+=================================== slowest 10 test durations ====================================
+0.20s call     tests/test_studies.py::test_study_one
+0.10s call     tests/test_studies.py::test_foo
+0.10s call     tests/test_studies.py::test_gather_info
+0.05s call     tests/test_studies.py::test_independent
+0.00s setup    tests/test_studies.py::test_independent
+0.00s setup    tests/test_studies.py::test_gather_info
+0.00s setup    tests/test_studies.py::test_study_one
+0.00s setup    tests/test_studies.py::test_foo
+0.00s teardown tests/test_studies.py::test_foo
+0.00s teardown tests/test_studies.py::test_independent
+==================================== 4 passed in 0.48 seconds ====================================
+```
+
 
 ## Install
 
@@ -206,7 +267,7 @@ where the sequence order and the name of associate study is show for each test.
 $ pip install pytest-study
 ```
 
-or download and improve the code by yourself installing in develop mode in your home directory
+or download and improve the code by yourself :) installing in develop mode in your home directory
 
 ```
  python setup.py develop --user
@@ -215,4 +276,4 @@ or download and improve the code by yourself installing in develop mode in your 
 
 ## Python versions
 
-Is tested only in python 2.7, but there is not any deliberated incompatibility with python 3.x versions.
+Is tested only in python 2.7 yet, but there is not any deliberated incompatibility with python 3.x versions.

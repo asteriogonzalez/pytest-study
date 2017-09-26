@@ -12,7 +12,7 @@ setup(
     name='pytest-study',
     license='MIT',
     # packages=['pytest-study'],
-    version='0.12',
+    version='0.13',
     description="A pytest plugin to organize long run tests (named studies) without interfering the regular tests",
     author='Asterio Gonzalez',
     author_email='asterio.gonzalez@gmail.com',
