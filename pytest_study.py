@@ -163,7 +163,7 @@ def pytest_collection_modifyitems(config, items):
 
     skip_test = pytest.mark.skip(reason="need --runstudy option to run")
     for item in items:
-        if "study" in item.keywords:
+        if set(item.keywords.keys()).intersection(MARKS):
             item.add_marker(skip_test)
 
 # ------------------------------------------
